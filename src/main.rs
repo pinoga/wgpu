@@ -96,10 +96,18 @@ impl winit::application::ApplicationHandler for App {
         _window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
+        let graphics = self.graphics.as_mut().unwrap();
         match event {
             winit::event::WindowEvent::CloseRequested => event_loop.exit(),
             winit::event::WindowEvent::RedrawRequested => {
-                return self.graphics.as_ref().unwrap().window.request_redraw();
+                return graphics.window.request_redraw();
+            }
+            winit::event::WindowEvent::Resized(size) => {
+                graphics.surface_config.height = size.height;
+                graphics.surface_config.width = size.width;
+                graphics
+                    .surface
+                    .configure(&graphics.device, &graphics.surface_config);
             }
             _ => (),
         }
