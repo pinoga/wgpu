@@ -4,55 +4,48 @@ use wgpu::{Instance, RequestAdapterOptions};
 
 #[derive(Default)]
 struct App {
-    graphics_context: Option<GraphicsContext>,
+    graphics: Option<GraphicsContext>,
 }
 
 struct GraphicsContext {
     window: Arc<winit::window::Window>,
-    wgpu_instance: wgpu::Instance,
-    wgpu_surface: Option<wgpu::Surface<'static>>,
-    wgpu_adapter: Option<wgpu::Adapter>,
+    instance: wgpu::Instance,
+    surface: wgpu::Surface<'static>,
+    adapter: wgpu::Adapter,
 }
 
 impl GraphicsContext {
-    fn initialize_surface(&mut self) {
-        self.wgpu_surface = Some(
-            self.wgpu_instance
-                .create_surface(self.window.clone())
-                .unwrap(),
-        );
-    }
+    fn new(window: Arc<winit::window::Window>, instance: wgpu::Instance) -> Self {
+        let surface = instance.create_surface(window.clone()).unwrap();
+        let adapter = pollster::block_on(instance.request_adapter(&RequestAdapterOptions {
+            compatible_surface: Some(&surface),
+            ..Default::default()
+        }))
+        .unwrap();
 
-    fn initialize_adapter(&mut self) {
-        self.wgpu_adapter = Some(
-            pollster::block_on(self.wgpu_instance.request_adapter(&RequestAdapterOptions {
-                compatible_surface: self.wgpu_surface.as_ref(),
-                ..Default::default()
-            }))
-            .unwrap(),
-        );
+        Self {
+            window,
+            instance,
+            surface,
+            adapter,
+        }
     }
 }
 
 impl winit::application::ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        if !self.graphics_context.is_some() {
-            self.graphics_context = Some(GraphicsContext {
-                wgpu_instance: Instance::default(),
-                window: Arc::new(
-                    event_loop
-                        .create_window(winit::window::Window::default_attributes())
-                        .unwrap(),
-                ),
-                wgpu_adapter: None,
-                wgpu_surface: None,
-            })
+        if self.graphics.is_some() {
+            return;
         }
 
-        let ctx = self.graphics_context.as_mut().unwrap();
-
-        ctx.initialize_surface();
-        ctx.initialize_adapter();
+        self.graphics = Some(GraphicsContext::new(
+            Arc::new(
+                event_loop
+                    .create_window(winit::window::Window::default_attributes())
+                    .unwrap(),
+            ),
+            Instance::default(),
+        ))
     }
 
     fn window_event(
@@ -64,13 +57,7 @@ impl winit::application::ApplicationHandler for App {
         match event {
             winit::event::WindowEvent::CloseRequested => event_loop.exit(),
             winit::event::WindowEvent::RedrawRequested => {
-                return self
-                    .graphics_context
-                    .as_ref()
-                    .unwrap()
-                    .window
-                    .as_ref()
-                    .request_redraw();
+                return self.graphics.as_ref().unwrap().window.request_redraw();
             }
             _ => (),
         }
