@@ -12,6 +12,8 @@ struct GraphicsContext {
     instance: wgpu::Instance,
     surface: wgpu::Surface<'static>,
     adapter: wgpu::Adapter,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
 }
 
 impl GraphicsContext {
@@ -23,11 +25,26 @@ impl GraphicsContext {
         }))
         .unwrap();
 
+        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+            label: None,
+            required_features: wgpu::Features::empty(),
+            required_limits: if cfg!(target_arch = "wasm32") {
+                wgpu::Limits::downlevel_webgl2_defaults()
+            } else {
+                wgpu::Limits::defaults()
+            },
+            memory_hints: Default::default(),
+            trace: wgpu::Trace::Off,
+        }))
+        .unwrap();
+
         Self {
             window,
             instance,
             surface,
             adapter,
+            queue,
+            device,
         }
     }
 }
