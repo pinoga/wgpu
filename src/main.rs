@@ -14,16 +14,40 @@ struct GraphicsContext {
     adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
+    surface_config: wgpu::SurfaceConfiguration,
 }
 
 impl GraphicsContext {
     fn new(window: Arc<winit::window::Window>, instance: wgpu::Instance) -> Self {
+        let size = window.inner_size();
+
         let surface = instance.create_surface(window.clone()).unwrap();
+
         let adapter = pollster::block_on(instance.request_adapter(&RequestAdapterOptions {
             compatible_surface: Some(&surface),
             ..Default::default()
         }))
         .unwrap();
+
+        let surface_caps = surface.get_capabilities(&adapter);
+
+        let surface_format = surface_caps
+            .formats
+            .iter()
+            .find(|f| f.is_srgb())
+            .copied()
+            .unwrap_or(surface_caps.formats[0]);
+
+        let surface_config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface_format,
+            width: size.width,
+            height: size.height,
+            present_mode: surface_caps.present_modes[0],
+            alpha_mode: surface_caps.alpha_modes[0],
+            desired_maximum_frame_latency: 2,
+            view_formats: vec![],
+        };
 
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: None,
@@ -39,6 +63,7 @@ impl GraphicsContext {
         .unwrap();
 
         Self {
+            surface_config,
             window,
             instance,
             surface,
