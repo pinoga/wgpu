@@ -1,3 +1,4 @@
+mod constants;
 use std::sync::Arc;
 
 use wgpu::{
@@ -88,7 +89,7 @@ impl GraphicsContext {
                     view: &view,
                     depth_slice: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
+                        load: wgpu::LoadOp::Clear(constants::WHITE),
                         store: wgpu::StoreOp::Store,
                     },
                     resolve_target: None,
