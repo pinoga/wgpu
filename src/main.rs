@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use wgpu::{Instance, RequestAdapterOptions};
+use wgpu::{
+    Instance, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
+    RequestAdapterOptions, TextureFormat,
+};
 
 #[derive(Default)]
 struct App {
@@ -72,6 +75,29 @@ impl GraphicsContext {
             device,
         }
     }
+
+    pub fn draw_triangle(&self) {
+        let frame = self.surface.get_current_texture().unwrap();
+        let view = frame.texture.create_view(&Default::default());
+        let mut encoder = self.device.create_command_encoder(&Default::default());
+        {
+            encoder.begin_render_pass(&RenderPassDescriptor {
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    view: &view,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                    resolve_target: None,
+                })],
+                ..Default::default()
+            });
+        }
+        let command_buffer = encoder.finish();
+        self.queue.submit([command_buffer]);
+        frame.present();
+    }
 }
 
 impl winit::application::ApplicationHandler for App {
@@ -87,7 +113,7 @@ impl winit::application::ApplicationHandler for App {
                     .unwrap(),
             ),
             Instance::default(),
-        ))
+        ));
     }
 
     fn window_event(
@@ -100,6 +126,7 @@ impl winit::application::ApplicationHandler for App {
         match event {
             winit::event::WindowEvent::CloseRequested => event_loop.exit(),
             winit::event::WindowEvent::RedrawRequested => {
+                graphics.draw_triangle();
                 return graphics.window.request_redraw();
             }
             winit::event::WindowEvent::Resized(size) => {
