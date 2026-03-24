@@ -65,6 +65,8 @@ impl GraphicsContext {
         }))
         .unwrap();
 
+        surface.configure(&device, &surface_config);
+
         Self {
             surface_config,
             window,
