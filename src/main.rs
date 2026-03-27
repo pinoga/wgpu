@@ -2,8 +2,9 @@ mod constants;
 use std::sync::Arc;
 
 use wgpu::{
-    Instance, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
-    RequestAdapterOptions, TextureFormat,
+    BlendState, ColorTargetState, ColorWrites, FragmentState, Instance, PipelineCompilationOptions,
+    PipelineLayout, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
+    RequestAdapterOptions, ShaderModule, TextureFormat, VertexState,
 };
 
 #[derive(Default)]
@@ -17,6 +18,7 @@ struct GraphicsContext {
     surface: wgpu::Surface<'static>,
     adapter: wgpu::Adapter,
     device: wgpu::Device,
+    solid_mesh_pipeline: wgpu::RenderPipeline,
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
 }
@@ -68,7 +70,56 @@ impl GraphicsContext {
 
         surface.configure(&device, &surface_config);
 
+        let solid_mesh_shader =
+            device.create_shader_module(wgpu::include_wgsl!("shaders/solid_mesh.wgsl"));
+
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render pipeline layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
+
+        let solid_mesh_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("solid"),
+            layout: Some(&render_pipeline_layout),
+            vertex: VertexState {
+                buffers: &[],
+                module: &solid_mesh_shader,
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                entry_point: Some("vs_main"),
+            },
+            fragment: Some(FragmentState {
+                compilation_options: PipelineCompilationOptions::default(),
+                module: &solid_mesh_shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(ColorTargetState {
+                    format: surface_config.format,
+                    blend: Some(BlendState::REPLACE),
+                    write_mask: ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+            cache: None,
+        });
+
         Self {
+            solid_mesh_pipeline,
             surface_config,
             window,
             instance,
